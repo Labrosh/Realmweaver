@@ -58,7 +58,7 @@ JSON/SQLite (Data storage for world state & history)
 
 Clone the repo:
 
-git clone https://github.com/yourusername/realmweaver.git
+git clone https://github.com/Labrosh/Realmweaver.git
 cd realmweaver
 
 Install dependencies:
