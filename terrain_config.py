@@ -1,8 +1,3 @@
-# Config for terrain generation - for now it just stores emojis as an alternative to letters
+# Config for terrain generation (for future terrain expansion)
 
-TERRAIN_MAP = {
-    "W": "🌊",  # Water
-    "F": "🌲",  # Forest
-    "D": "🏜",  # Desert
-    "M": "⛰"   # Mountain
-}
+# You can still use this file to store color mappings or add new biomes later!
