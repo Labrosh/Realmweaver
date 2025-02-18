@@ -1,4 +1,4 @@
-🌍 Project: Realmweaver
+# 🌍 Project: Realmweaver
 
 📜 Overview
 
@@ -58,8 +58,10 @@ JSON/SQLite (Data storage for world state & history)
 
 Clone the repo:
 
+```bash
 git clone https://github.com/Labrosh/Realmweaver.git
 cd realmweaver
+```
 
 Install dependencies:
 
