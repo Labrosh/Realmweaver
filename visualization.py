@@ -9,34 +9,48 @@ from world_generator import generate_world # so we can grab my world generator s
 # color mapping for different terrains
 
 TERRAIN_COLORS = {
-    "W": "blue", # Water
-    "F": "green", # Forest
-    "D": "yellow", # Desert
-    "M": "brown" # Mountain
+    "W": ("blue", "Water"),
+    "F": ("green", "Forest"),
+    "D": ("yellow", "Desert"),
+    "M": ("brown", "Mountain")
 }
 
-def visualize_world(world, seed=None):
+def visualize_world(world, seed=None, save_path=None, show=True):
     """Creates a color-coded map of the generated world"""
     size = len(world)
     color_grid = np.zeros((size, size, 3)) # 3 for RGB - woah cool - I didn't know you could do that
 
+    # Create figure with specific size for better quality
+    plt.figure(figsize=(10, 8))
+    
     for i in range(size):
         for j in range(size):
-           terrain = world[i][j]
-           color = TERRAIN_COLORS.get(terrain, "black") # ah if we don't have a color for the terrain, we just make it black - I guess future proofing since we only have the four terrains right now
-           color_grid[i, j] = mcolors.to_rgb(color) # and then we color the grid!
+            terrain = world[i][j]
+            color = TERRAIN_COLORS.get(terrain, ("black", "Unknown"))[0]
+            color_grid[i, j] = mcolors.to_rgb(color)
 
+    plt.imshow(color_grid)
+    plt.axis("off")
     
-    # plot the world map - This whole part looks like boiler plate how to use plt stuff - but might as well double check what it does when I check in.
-    plt.imshow(color_grid) # Check
-    plt.axis("off") # check
+    # Add legend
+    legend_elements = [plt.Rectangle((0,0),1,1, facecolor=color, label=label)
+                      for terrain, (color, label) in TERRAIN_COLORS.items()]
+    plt.legend(handles=legend_elements, loc='center left', bbox_to_anchor=(1, 0.5))
     
-    # Claude added this part - adds seed number to plot title if one exists
     title = "Realmweaver - Procedural World"
     if seed is not None:
         title += f" (Seed: {seed})"
     plt.title(title)
-    plt.show()
+    
+    # Save if path provided
+    if save_path:
+        plt.savefig(save_path, bbox_inches='tight', dpi=300)
+    
+    # Show if requested
+    if show:
+        plt.show()
+    
+    plt.close()
 
 if __name__ == "__main__":
     # Claude added this part - updated to handle the seed value that generate_world now returns

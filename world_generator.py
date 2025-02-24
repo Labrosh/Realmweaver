@@ -1,21 +1,18 @@
 # Core logic for generating the world
 # our first step will be making a basic 50x50 grid - this was suggested because it is nice and big, and simple like me! 😊
 
-
-# import terrain_config  # now this can be called if I update terrain_config.py to be used again
-import noise # perlin noise is COOL - thanks AI for the explination - see lower down where we actually use it
+from opensimplex import OpenSimplex
 import numpy as np
 import random  # Claude added this - needed for seed generation
 
 # Lets see - this should 'make the world' - it looks like the code is just mashing together a bunch of random terrain types to make a grid.
 # this looks gross, so try to revisit - maybe we can move some logic to put stuff that makes sense in correct places?
 
-# Terrain threshholds here
-WATER_LEVEL = -0.3
-FOREST_LEVEL = 0.1
-DESERT_LEVEL = 0.4
-MOUNTAIN_LEVEL = 0.7
-
+# Terrain thresholds here - adjusted for normalized OpenSimplex values (0 to 1 range)
+WATER_LEVEL = 0.3    # Lower 30% is water
+FOREST_LEVEL = 0.5   # Next 20% is forest
+DESERT_LEVEL = 0.7   # Next 20% is desert
+# Everything above 0.7 becomes mountain (30%)
 
 # Terrain types stored here for the test
 TERRAIN_TYPES = {
@@ -31,31 +28,19 @@ def string_to_seed(s):
     return hash(s) & 0xFFFFFFFF
 
 def generate_world(size=50, scale=10.0, seed=None):
-    """Generates a world using perlin noise for natural terrain generation"""
-    # Claude added this - handle seed initialization
+    """Generates a world using OpenSimplex noise for natural terrain generation"""
     if seed is None:
-        seed = random.randint(0, 1000000)
-    elif isinstance(seed, str):
-        seed = string_to_seed(seed)
-    print(f"Generated Seed: {seed}")
+        seed = np.random.randint(0, 2**32 - 1)
     
-    random.seed(seed)
+    # Set the seed for both numpy and noise
     np.random.seed(seed)
     
-    world = np.zeros((size,size), dtype=str) # okay so here is what I got
-    # np.zeros is a numpy function that creates an array of zeros, and we are making a 50x50 grid of strings and we use the dtype str because we are using Ws and Fs and stuff, not numbers
-    # we could do np.full, but IDK what that is or why it would "Be easier to understand at a glance" - recheck this later
-    # suggested alternative code: world = np.full((size, size), "", dtype=str)
+    noise_gen = OpenSimplex(seed=seed)
+    world = np.zeros((size,size), dtype=str)
 
     for i in range(size):
         for j in range(size):
-            # Generates a perlins noise value with seed
-            noise_value = noise.pnoise2(
-                (i + seed) / scale, (j + seed) / scale,
-                octaves=6, persistence=0.5, lacunarity=2.0
-            ) # scale is the size of the world, octaves is the number of levels of detail you want to generate, persistence is the roughness of the terrain, and lacunarity is the frequency of the terrain
-            # so big scale = big world, big octaves = more detail, big persistence = rougher terrain, big lacunarity = more frequent terrain
-            # and small scale = small world, small octaves = less detail, small persistence = smoother terrain, small lacunarity = less frequent terrain
+            noise_value = (noise_gen.noise2(i / scale, j / scale) + 1) / 2  # Convert from [-1,1] to [0,1]
 
             if noise_value < WATER_LEVEL:
                 world[i][j] = "W" # Water

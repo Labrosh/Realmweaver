@@ -71,6 +71,27 @@ Run the world generator:
 
 python realmweaver.py
 
+## Usage
+
+Generate and visualize a world using the command line:
+
+```bash
+# Generate and show a new random world
+python realmweaver.py --show
+
+# Generate with specific size
+python realmweaver.py --size 100 --show
+
+# Generate with specific seed
+python realmweaver.py --seed 12345 --show
+
+# Save to image file
+python realmweaver.py --save map.png
+
+# Generate, show, and save
+python realmweaver.py --show --save map.png
+```
+
 🎭 Future Ideas
 
 Interactive Mode (Allow players to influence world events)
