@@ -1,4 +1,6 @@
 # Code for displaying the world (Suggested to use matplotlib? look into!)
+# This is part of the initial version - we're just trying to get something that looks nice on the screen
+# My first attempt at trying to use matplotlib - seems to work okay! The colors help see what's what.
 
 import matplotlib.pyplot as plt # this has to be the standard - I see it all the time when I looked at code...in my one other time I used it
 import matplotlib.colors as mcolors # AI helped track down why this broke code

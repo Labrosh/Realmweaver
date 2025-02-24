@@ -29,7 +29,9 @@ def string_to_seed(s):
 
 def generate_world(size=50, scale=10.0, seed=None):
     """Generates a world using OpenSimplex noise for natural terrain generation"""
-    if seed is None:
+    if isinstance(seed, str):
+        seed = string_to_seed(seed)
+    elif seed is None:
         seed = np.random.randint(0, 2**32 - 1)
     
     # Set the seed for both numpy and noise
