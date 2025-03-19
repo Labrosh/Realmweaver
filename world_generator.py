@@ -47,6 +47,9 @@ class World:
         # For backward compatibility
         self.legacy_map = np.zeros((size, size), dtype=str)
         
+        # Biome weights (default is 1.0 for all biomes)
+        self.biome_weights = {}
+        
     def generate(self):
         """Generate all aspects of the world"""
         self._generate_elevation_map()
@@ -146,11 +149,154 @@ class World:
         
         return self.temperature_map
     
+    def set_biome_weights(self, biome_weights):
+        """
+        Set custom weights for biomes to influence world generation.
+        
+        Args:
+            biome_weights: A dictionary mapping biome names to weight values (0.0-2.0)
+                           where 1.0 is normal weight, <1.0 is less common, >1.0 is more common
+        """
+        self.biome_weights = biome_weights
+        return self
+    
     def _generate_biomes(self):
         """
         Determine the biome for each cell based on elevation, moisture, and temperature.
         This creates a realistic distribution of biomes across the world.
+        Takes into account custom biome weights if they have been set.
         """
+        # Create a completely new elevation and moisture map if we have biome weights
+        if self.biome_weights and any(weight != 1.0 for weight in self.biome_weights.values()):
+            # Store original maps for reference
+            original_elevation_map = np.copy(self.elevation_map)
+            original_moisture_map = np.copy(self.moisture_map)
+            
+            # Create new maps that will be heavily influenced by biome weights
+            new_elevation_map = np.zeros((self.size, self.size))
+            new_moisture_map = np.zeros((self.size, self.size))
+            
+            # Get the highest weighted biomes
+            biome_weights = self.biome_weights.copy()
+            
+            # First pass: Create regions for high-weight biomes
+            # This is a more deterministic approach than the previous random one
+            for y in range(self.size):
+                for x in range(self.size):
+                    # Start with the original values
+                    new_elevation_map[y][x] = original_elevation_map[y][x]
+                    new_moisture_map[y][x] = original_moisture_map[y][x]
+                    
+                    # Get the original biome at this location
+                    _, _, original_biome = get_biome(original_elevation_map[y][x], original_moisture_map[y][x])
+                    
+                    # Check if this biome has a weight
+                    if original_biome in biome_weights:
+                        weight = biome_weights[original_biome]
+                        
+                        # If weight > 1.0, enhance this biome's characteristics
+                        if weight > 1.0:
+                            # Calculate enhancement factor (1.0 = no change, 2.0 = double effect)
+                            factor = 1.0 + (weight - 1.0) * 2.0
+                            
+                            if original_biome in ["DESERT", "SAVANNA"]:
+                                # For deserts, decrease moisture dramatically
+                                new_moisture_map[y][x] /= factor
+                            elif original_biome in ["RAINFOREST", "JUNGLE", "SWAMP", "MARSH"]:
+                                # For wet biomes, increase moisture dramatically
+                                new_moisture_map[y][x] = min(1.0, new_moisture_map[y][x] * factor)
+                            elif original_biome in ["MOUNTAIN", "MOUNTAIN_FOREST", "ALPINE", "SNOW_CAP"]:
+                                # For mountains, increase elevation dramatically
+                                new_elevation_map[y][x] = min(1.0, new_elevation_map[y][x] + (factor - 1.0) * 0.5)
+                            elif original_biome in ["DEEP_OCEAN", "OCEAN", "SHALLOW_WATER"]:
+                                # For water, decrease elevation dramatically
+                                new_elevation_map[y][x] /= factor
+                        # If weight < 1.0, reduce this biome's characteristics
+                        elif weight < 1.0:
+                            # Calculate reduction factor (1.0 = no change, 0.5 = half effect)
+                            factor = weight
+                            
+                            if original_biome in ["DESERT", "SAVANNA"]:
+                                # For deserts, increase moisture
+                                new_moisture_map[y][x] = min(1.0, new_moisture_map[y][x] + (1.0 - factor))
+                            elif original_biome in ["RAINFOREST", "JUNGLE", "SWAMP", "MARSH"]:
+                                # For wet biomes, decrease moisture
+                                new_moisture_map[y][x] *= factor
+                            elif original_biome in ["MOUNTAIN", "MOUNTAIN_FOREST", "ALPINE", "SNOW_CAP"]:
+                                # For mountains, decrease elevation
+                                new_elevation_map[y][x] *= factor
+                            elif original_biome in ["DEEP_OCEAN", "OCEAN", "SHALLOW_WATER"]:
+                                # For water, increase elevation
+                                new_elevation_map[y][x] = min(1.0, new_elevation_map[y][x] + (1.0 - factor) * 0.5)
+            
+            # Second pass: Create large regions of high-weight biomes
+            # Find biomes with weight > 1.5 to create new regions
+            high_weight_biomes = {biome: weight for biome, weight in biome_weights.items() if weight > 1.5}
+            
+            if high_weight_biomes:
+                # Create regions for each high-weight biome
+                for biome_name, weight in high_weight_biomes.items():
+                    # Number of regions to create based on weight
+                    num_regions = int((weight - 1.0) * 5)
+                    
+                    for _ in range(num_regions):
+                        # Create a region center
+                        center_x = np.random.randint(0, self.size)
+                        center_y = np.random.randint(0, self.size)
+                        
+                        # Region size based on weight
+                        region_size = int(self.size * (weight - 1.0) * 0.2)
+                        
+                        # Create the region
+                        for y in range(max(0, center_y - region_size), min(self.size, center_y + region_size)):
+                            for x in range(max(0, center_x - region_size), min(self.size, center_x + region_size)):
+                                # Distance from center (0.0 to 1.0)
+                                dist = np.sqrt((x - center_x)**2 + (y - center_y)**2) / region_size
+                                
+                                # Only modify if within region
+                                if dist < 1.0:
+                                    # Strength of effect decreases with distance from center
+                                    strength = 1.0 - dist
+                                    
+                                    if biome_name in ["DESERT", "SAVANNA"]:
+                                        # For deserts, set low moisture and appropriate elevation
+                                        target_moisture = np.random.uniform(0.0, MOISTURE_THRESHOLDS["DRY"] * 0.8)
+                                        target_elevation = np.random.uniform(ELEVATION_THRESHOLDS["BEACH"] * 1.1,
+                                                                          ELEVATION_THRESHOLDS["HIGHLANDS"] * 0.9)
+                                        
+                                        # Blend with original values based on distance
+                                        new_moisture_map[y][x] = new_moisture_map[y][x] * (1.0 - strength) + target_moisture * strength
+                                        new_elevation_map[y][x] = new_elevation_map[y][x] * (1.0 - strength) + target_elevation * strength
+                                        
+                                    elif biome_name in ["RAINFOREST", "JUNGLE"]:
+                                        # For rainforests, set high moisture and appropriate elevation
+                                        target_moisture = np.random.uniform(MOISTURE_THRESHOLDS["WET"] * 1.1, 1.0)
+                                        target_elevation = np.random.uniform(ELEVATION_THRESHOLDS["BEACH"] * 1.1,
+                                                                          ELEVATION_THRESHOLDS["LOWLANDS"] * 0.9)
+                                        
+                                        # Blend with original values based on distance
+                                        new_moisture_map[y][x] = new_moisture_map[y][x] * (1.0 - strength) + target_moisture * strength
+                                        new_elevation_map[y][x] = new_elevation_map[y][x] * (1.0 - strength) + target_elevation * strength
+                                        
+                                    elif biome_name in ["MOUNTAIN", "MOUNTAIN_FOREST", "ALPINE", "SNOW_CAP"]:
+                                        # For mountains, set high elevation
+                                        target_elevation = np.random.uniform(ELEVATION_THRESHOLDS["MOUNTAINS"] * 1.1, 1.0)
+                                        
+                                        # Blend with original values based on distance
+                                        new_elevation_map[y][x] = new_elevation_map[y][x] * (1.0 - strength) + target_elevation * strength
+                                        
+                                    elif biome_name in ["DEEP_OCEAN", "OCEAN"]:
+                                        # For oceans, set very low elevation
+                                        target_elevation = np.random.uniform(0.0, ELEVATION_THRESHOLDS["SHALLOW_WATER"] * 0.8)
+                                        
+                                        # Blend with original values based on distance
+                                        new_elevation_map[y][x] = new_elevation_map[y][x] * (1.0 - strength) + target_elevation * strength
+            
+            # Use the new maps
+            self.elevation_map = new_elevation_map
+            self.moisture_map = new_moisture_map
+        
+        # Generate biomes using the elevation and moisture maps
         for y in range(self.size):
             for x in range(self.size):
                 elevation = self.elevation_map[y][x]
